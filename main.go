@@ -6,6 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
+	"regexp"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -14,7 +17,9 @@ import (
 )
 
 func getIP(ipv6 bool) (string, error) {
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: time.Second * 2,
+	}
 	url := "http://api.ipify.org"
 	if ipv6 {
 		url = "http://api6.ipify.org"
@@ -55,9 +60,32 @@ func setDNS(c *cli.Context, name *string, ip *string, record *string) error {
 	return err
 }
 
+func getBMCOutput() (string, error) {
+	out, err := exec.Command("sudo", "ipmitool", "lan", "print").Output()
+	if err != nil {
+		return "", err
+	}
+
+	return string(out), nil
+}
+
+func getBMCIP() (string, error) {
+	out, err := getBMCOutput()
+	if err != nil {
+		return "", err
+	}
+
+	regex := *regexp.MustCompile(`IP Address\s+:\s([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)`)
+	match := regex.FindAllStringSubmatch(out, -1)
+	fmt.Println(match)
+
+	return match[0][0], nil
+}
+
 func action(c *cli.Context) error {
 	domain := c.String("domain")
 	hostname, err := os.Hostname()
+	fmt.Println("Got hostname", hostname)
 	if err != nil {
 		fmt.Println("Failed to get hostname")
 		return err
@@ -66,7 +94,9 @@ func action(c *cli.Context) error {
 	name := fmt.Sprintf("%s.%s", hostname, domain)
 
 	ip4, err4 := getIP(false)
+	fmt.Println("Got ipv4", hostname)
 	ip6, err6 := getIP(true)
+	fmt.Println("Got ipv6", hostname)
 	if err4 == nil {
 		fmt.Printf("Set A record of %s to %s\n", name, ip4)
 		err = setDNS(c, &name, &ip4, aws.String("A"))
@@ -88,6 +118,12 @@ func action(c *cli.Context) error {
 	if err4 != nil && err6 != nil {
 		fmt.Println("Failed to get both public ip v4 and v6")
 		return err4
+	}
+
+	bmc, err := getBMCIP()
+	if err == nil {
+		name := fmt.Sprintf("bmc.%s.%s", hostname, domain)
+		fmt.Printf("Set A record of %s to %s\n", name, bmc)
 	}
 
 	return nil
