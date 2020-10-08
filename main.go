@@ -132,9 +132,10 @@ func action(c *cli.Context) error {
 
 func main() {
 	app := &cli.App{
-		Name:   "ddns",
-		Usage:  "DDNS util",
-		Action: action,
+		Name:    "ddns",
+		Usage:   "DDNS util",
+		Action:  action,
+		Version: "1.0",
 		Flags: []cli.Flag{&cli.StringFlag{
 			Name:     "id, i",
 			Usage:    "Hosted zone id",
