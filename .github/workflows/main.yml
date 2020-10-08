@@ -41,10 +41,10 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          target: powerpc64le-unknown-linux-musl
+          target: powerpc64le-unknown-linux-gnu
           override: true
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: build
-          args: --target powerpc64le-unknown-linux-musl
+          args: --target powerpc64le-unknown-linux-gnu
