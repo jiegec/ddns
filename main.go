@@ -77,9 +77,7 @@ func getBMCIP() (string, error) {
 
 	regex := *regexp.MustCompile(`IP Address\s+:\s([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)`)
 	match := regex.FindAllStringSubmatch(out, -1)
-	fmt.Println(match)
-
-	return match[0][0], nil
+	return match[0][1], nil
 }
 
 func action(c *cli.Context) error {
@@ -94,9 +92,7 @@ func action(c *cli.Context) error {
 	name := fmt.Sprintf("%s.%s", hostname, domain)
 
 	ip4, err4 := getIP(false)
-	fmt.Println("Got ipv4", hostname)
 	ip6, err6 := getIP(true)
-	fmt.Println("Got ipv6", hostname)
 	if err4 == nil {
 		fmt.Printf("Set A record of %s to %s\n", name, ip4)
 		err = setDNS(c, &name, &ip4, aws.String("A"))
@@ -124,6 +120,11 @@ func action(c *cli.Context) error {
 	if err == nil {
 		name := fmt.Sprintf("bmc.%s.%s", hostname, domain)
 		fmt.Printf("Set A record of %s to %s\n", name, bmc)
+		err = setDNS(c, &name, &bmc, aws.String("A"))
+		if err != nil {
+			fmt.Println("Failed to set dns")
+			return err
+		}
 	}
 
 	return nil
