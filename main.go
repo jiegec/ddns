@@ -61,7 +61,13 @@ func setDNS(c *cli.Context, name *string, ip *string, record *string) error {
 }
 
 func getBMCOutput() (string, error) {
-	out, err := exec.Command("sudo", "ipmitool", "lan", "print").Output()
+	// check existence
+	out, err := exec.Command("which", "ipmitool").Output()
+	if err != nil || len(out) == 0 {
+		return "", err
+	}
+
+	out, err = exec.Command("sudo", "ipmitool", "lan", "print").Output()
 	if err != nil {
 		return "", err
 	}
