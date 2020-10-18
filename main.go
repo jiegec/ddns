@@ -124,7 +124,7 @@ func action(c *cli.Context) error {
 
 	bmc, err := getBMCIP()
 	if err == nil {
-		name := fmt.Sprintf("bmc.%s.%s", hostname, domain)
+		name := fmt.Sprintf("bmc-%s.%s", hostname, domain)
 		fmt.Printf("Set A record of %s to %s\n", name, bmc)
 		err = setDNS(c, &name, &bmc, aws.String("A"))
 		if err != nil {
