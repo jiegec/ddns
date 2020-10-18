@@ -44,6 +44,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         tag_name="${GITHUB_REF##*/}"
+        hub release edit $(find . -type f -executable -name "ddns-windows-amd64" -printf "-a %p ") -m "" "$tag_name" 
         hub release edit $(find . -type f -executable -name "ddns-darwin-amd64" -printf "-a %p ") -m "" "$tag_name" 
         hub release edit $(find . -type f -executable -name "ddns-linux-amd64" -printf "-a %p ") -m "" "$tag_name" 
         hub release edit $(find . -type f -executable -name "ddns-linux-arm64" -printf "-a %p ") -m "" "$tag_name" 
