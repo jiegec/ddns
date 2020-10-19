@@ -109,7 +109,11 @@ func (p *rfc2136Provider) Get(name string, record string) ([]string, error) {
 	}
 	for _, r := range reply.Answer {
 		if r.Header().Name == name {
-			ret = append(ret, r.(*dns.A).A.String())
+			if r.Header().Rrtype == dns.TypeA {
+				ret = append(ret, r.(*dns.A).A.String())
+			} else if r.Header().Rrtype == dns.TypeAAAA {
+				ret = append(ret, r.(*dns.AAAA).AAAA.String())
+			}
 		}
 	}
 	return ret, err

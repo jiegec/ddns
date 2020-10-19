@@ -90,11 +90,11 @@ func getBMCIP() (string, error) {
 }
 
 func update(name string, value string, record string, provider DDNSProvider) error {
-	orig, err := provider.Get(name, "A")
+	orig, err := provider.Get(name, record)
+	log.Printf("The '%s' record of %s was %s\n", record, name, orig)
 	for _, r := range orig {
 		if r == value {
 			// Found
-			log.Printf("The '%s' record of %s is already %s\n", record, name, value)
 			return err
 		}
 	}
