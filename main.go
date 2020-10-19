@@ -86,8 +86,30 @@ func getBMCIP() (string, error) {
 	return match[0][1], nil
 }
 
-func action(c *cli.Context) error {
-	domain := c.String("domain")
+func update(name string, value string, record string, provider DDNSProvider) error {
+	orig, err := provider.Get(name, "A")
+	for _, r := range orig {
+		if r == value {
+			// Found
+			fmt.Printf("The '%s' record of %s is already %s\n", record, name, value)
+			return err
+		}
+	}
+	fmt.Printf("Set '%s' record of %s to %s\n", record, name, value)
+	err = provider.Set(name, value, record)
+	return err
+}
+
+func actionRoute53(c *cli.Context) error {
+	provider, err := newRoute53Provider(c)
+	if err == nil {
+		err = action(c, provider)
+	}
+	return err
+}
+
+func action(c *cli.Context, provider DDNSProvider) error {
+	domain := c.GlobalString("domain")
 	hostname, err := os.Hostname()
 	fmt.Println("Got hostname", hostname)
 	if err != nil {
@@ -95,13 +117,12 @@ func action(c *cli.Context) error {
 		return err
 	}
 
-	name := fmt.Sprintf("%s.%s", hostname, domain)
+	name := fmt.Sprintf("%s.%s.", hostname, domain)
 
 	ip4, err4 := getIP(false)
 	ip6, err6 := getIP(true)
 	if err4 == nil {
-		fmt.Printf("Set A record of %s to %s\n", name, ip4)
-		err = setDNS(c, &name, &ip4, aws.String("A"))
+		err = update(name, ip4, "A", provider)
 		if err != nil {
 			fmt.Println("Failed to set dns")
 			return err
@@ -109,8 +130,7 @@ func action(c *cli.Context) error {
 	}
 
 	if err6 == nil {
-		fmt.Printf("Set AAAA record of %s to %s\n", name, ip6)
-		err = setDNS(c, &name, &ip6, aws.String("AAAA"))
+		err = update(name, ip6, "AAAA", provider)
 		if err != nil {
 			fmt.Println("Failed to set dns")
 			return err
@@ -125,8 +145,7 @@ func action(c *cli.Context) error {
 	bmc, err := getBMCIP()
 	if err == nil {
 		name := fmt.Sprintf("bmc-%s.%s", hostname, domain)
-		fmt.Printf("Set A record of %s to %s\n", name, bmc)
-		err = setDNS(c, &name, &bmc, aws.String("A"))
+		err = update(name, bmc, "A", provider)
 		if err != nil {
 			fmt.Println("Failed to set dns")
 			return err
@@ -140,17 +159,26 @@ func main() {
 	app := &cli.App{
 		Name:    "ddns",
 		Usage:   "DDNS util",
-		Action:  action,
 		Version: "1.0",
 		Flags: []cli.Flag{&cli.StringFlag{
-			Name:     "id, i",
-			Usage:    "Hosted zone id",
-			Required: true,
-		}, &cli.StringFlag{
 			Name:     "domain, d",
-			Usage:    "Hosted zone domain",
+			Usage:    "Domain name",
 			Required: true,
 		}},
+		Commands: []cli.Command{
+			{
+				Name:  "route53",
+				Usage: "Use route53 as ddns backend",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "id, i",
+						Usage:    "Hosted zone id",
+						Required: true,
+					},
+				},
+				Action: actionRoute53,
+			},
+		},
 	}
 
 	err := app.Run(os.Args)
