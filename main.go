@@ -167,7 +167,7 @@ func main() {
 	app := &cli.App{
 		Name:    "ddns",
 		Usage:   "DDNS util",
-		Version: "1.1",
+		Version: "1.2",
 		Flags: []cli.Flag{
 			// global settings
 			&cli.StringFlag{
