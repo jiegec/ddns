@@ -104,17 +104,19 @@ func (p *rfc2136Provider) Get(name string, record string) ([]string, error) {
 	c.SingleInflight = true
 	reply, _, err := c.Exchange(m, p.NameServer)
 	ret := []string{}
-	if reply != nil && reply.Rcode != dns.RcodeSuccess {
-		return nil, fmt.Errorf("DNS query failed: server replied: %s", dns.RcodeToString[reply.Rcode])
-	}
-	for _, r := range reply.Answer {
-		if r.Header().Name == name {
-			if r.Header().Rrtype == dns.TypeA {
-				ret = append(ret, r.(*dns.A).A.String())
-			} else if r.Header().Rrtype == dns.TypeAAAA {
-				ret = append(ret, r.(*dns.AAAA).AAAA.String())
-			}
-		}
+	if reply != nil {
+        if reply.Rcode != dns.RcodeSuccess {
+            return nil, fmt.Errorf("DNS query failed: server replied: %s", dns.RcodeToString[reply.Rcode])
+        }
+        for _, r := range reply.Answer {
+            if r.Header().Name == name {
+                if r.Header().Rrtype == dns.TypeA {
+                    ret = append(ret, r.(*dns.A).A.String())
+                } else if r.Header().Rrtype == dns.TypeAAAA {
+                    ret = append(ret, r.(*dns.AAAA).AAAA.String())
+                }
+            }
+        }
 	}
 	return ret, err
 }
