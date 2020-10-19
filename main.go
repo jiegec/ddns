@@ -69,7 +69,8 @@ func getBMCOutput() (string, error) {
 		return "", err
 	}
 
-	out, err = exec.Command("sudo", "ipmitool", "lan", "print").Output()
+	// only support no password sudo
+	out, err = exec.Command("sudo", "-n", "ipmitool", "lan", "print").Output()
 	if err != nil {
 		return "", err
 	}
