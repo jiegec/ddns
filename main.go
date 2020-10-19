@@ -94,11 +94,11 @@ func update(name string, value string, record string, provider DDNSProvider) err
 	for _, r := range orig {
 		if r == value {
 			// Found
-			fmt.Printf("The '%s' record of %s is already %s\n", record, name, value)
+			log.Printf("The '%s' record of %s is already %s\n", record, name, value)
 			return err
 		}
 	}
-	fmt.Printf("Set '%s' record of %s to %s\n", record, name, value)
+	log.Printf("Set '%s' record of %s to %s\n", record, name, value)
 	err = provider.Set(name, value, record)
 	return err
 }
@@ -127,9 +127,9 @@ func action(c *cli.Context, provider DDNSProvider) error {
 	parts := strings.Split(hostname, ".")
 	hostname = parts[0]
 
-	fmt.Println("Got hostname", hostname)
+	log.Println("Got hostname", hostname)
 	if err != nil {
-		fmt.Println("Failed to get hostname")
+		log.Println("Failed to get hostname")
 		return err
 	}
 
@@ -140,7 +140,7 @@ func action(c *cli.Context, provider DDNSProvider) error {
 	if err4 == nil {
 		err = update(name, ip4, "A", provider)
 		if err != nil {
-			fmt.Println("Failed to set dns")
+			log.Println("Failed to set dns")
 			return err
 		}
 	}
@@ -148,13 +148,13 @@ func action(c *cli.Context, provider DDNSProvider) error {
 	if err6 == nil {
 		err = update(name, ip6, "AAAA", provider)
 		if err != nil {
-			fmt.Println("Failed to set dns")
+			log.Println("Failed to set dns")
 			return err
 		}
 	}
 
 	if err4 != nil && err6 != nil {
-		fmt.Println("Failed to get both public ip v4 and v6")
+		log.Println("Failed to get both public ip v4 and v6")
 		return err4
 	}
 
@@ -163,7 +163,7 @@ func action(c *cli.Context, provider DDNSProvider) error {
 		name := fmt.Sprintf("bmc-%s.%s", hostname, domain)
 		err = update(name, bmc, "A", provider)
 		if err != nil {
-			fmt.Println("Failed to set dns")
+			log.Println("Failed to set dns")
 			return err
 		}
 	}
