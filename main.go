@@ -161,7 +161,7 @@ func action(c *cli.Context, provider DDNSProvider) error {
 
 	bmc, err := getBMCIP()
 	if err == nil {
-		name := fmt.Sprintf("bmc-%s.%s", hostname, domain)
+		name := dns.Fqdn(fmt.Sprintf("bmc-%s.%s", hostname, domain))
 		err = update(name, bmc, "A", provider)
 		if err != nil {
 			log.Println("Failed to set dns")
