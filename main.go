@@ -8,11 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/miekg/dns"
 	"github.com/urfave/cli"
 )
 
@@ -108,16 +110,29 @@ func actionRoute53(c *cli.Context) error {
 	return err
 }
 
+func actionRfc2136(c *cli.Context) error {
+	provider, err := newRfc2136Provider(c)
+	if err == nil {
+		err = action(c, provider)
+	}
+	return err
+}
+
 func action(c *cli.Context, provider DDNSProvider) error {
 	domain := c.GlobalString("domain")
 	hostname, err := os.Hostname()
+
+	// use the first part before "."
+	parts := strings.Split(hostname, ".")
+	hostname = parts[0]
+
 	fmt.Println("Got hostname", hostname)
 	if err != nil {
 		fmt.Println("Failed to get hostname")
 		return err
 	}
 
-	name := fmt.Sprintf("%s.%s.", hostname, domain)
+	name := dns.Fqdn(fmt.Sprintf("%s.%s", hostname, domain))
 
 	ip4, err4 := getIP(false)
 	ip6, err6 := getIP(true)
@@ -167,16 +182,16 @@ func main() {
 		}},
 		Commands: []cli.Command{
 			{
-				Name:  "route53",
-				Usage: "Use route53 as ddns backend",
-				Flags: []cli.Flag{
-					&cli.StringFlag{
-						Name:     "id, i",
-						Usage:    "Hosted zone id",
-						Required: true,
-					},
-				},
+				Name:   "route53",
+				Usage:  "Use route53 as ddns backend",
+				Flags:  route53Flags,
 				Action: actionRoute53,
+			},
+			{
+				Name:   "rfc2136",
+				Usage:  "Use rfc2136 as ddns backend",
+				Flags:  rfc2136Flags,
+				Action: actionRfc2136,
 			},
 		},
 	}

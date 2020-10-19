@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
@@ -13,14 +11,21 @@ type route53Provider struct {
 	DomainZoneID string
 }
 
-func newRoute53Provider(c *cli.Context) (*route53Provider, error) {
-	id := c.String("id")
-	if id == "" {
-		return nil, fmt.Errorf("route53: id is missing")
-	}
+var route53Flags []cli.Flag
 
+func init() {
+	route53Flags = []cli.Flag{
+		&cli.StringFlag{
+			Name:     "id, i",
+			Usage:    "Hosted zone id",
+			Required: true,
+		},
+	}
+}
+
+func newRoute53Provider(c *cli.Context) (*route53Provider, error) {
 	return &route53Provider{
-		DomainZoneID: id,
+		DomainZoneID: c.String("id"),
 	}, nil
 }
 
