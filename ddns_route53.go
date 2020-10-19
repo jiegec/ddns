@@ -4,32 +4,19 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/urfave/cli"
 )
 
-type route53Provider struct {
+type Route53Provider struct {
 	DomainZoneID string
 }
 
-var route53Flags []cli.Flag
-
-func init() {
-	route53Flags = []cli.Flag{
-		&cli.StringFlag{
-			Name:     "id, i",
-			Usage:    "Hosted zone id",
-			Required: true,
-		},
-	}
-}
-
-func newRoute53Provider(c *cli.Context) (*route53Provider, error) {
-	return &route53Provider{
-		DomainZoneID: c.String("id"),
+func newRoute53Provider() (*Route53Provider, error) {
+	return &Route53Provider{
+		DomainZoneID: settings.DomainZoneID,
 	}, nil
 }
 
-func (p *route53Provider) Set(name string, value string, record string) error {
+func (p *Route53Provider) Set(name string, value string, record string) error {
 	sess := session.Must(session.NewSession())
 	client := route53.New(sess)
 	_, err := client.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
@@ -51,7 +38,7 @@ func (p *route53Provider) Set(name string, value string, record string) error {
 	return err
 }
 
-func (p *route53Provider) Get(name string, record string) ([]string, error) {
+func (p *Route53Provider) Get(name string, record string) ([]string, error) {
 	sess := session.Must(session.NewSession())
 	client := route53.New(sess)
 	resp, err := client.ListResourceRecordSets(&route53.ListResourceRecordSetsInput{

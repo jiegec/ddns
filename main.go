@@ -7,16 +7,17 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/juju/loggo"
 	"github.com/miekg/dns"
 	"github.com/urfave/cli"
 )
+
+var logger = loggo.GetLogger("ddns")
 
 func getIP(ipv6 bool) (string, error) {
 	client := &http.Client{
@@ -36,30 +37,6 @@ func getIP(ipv6 bool) (string, error) {
 		return "", err
 	}
 	return string(body), nil
-}
-
-func setDNS(c *cli.Context, name *string, ip *string, record *string) error {
-	id := c.String("id")
-
-	sess := session.Must(session.NewSession())
-	client := route53.New(sess)
-	_, err := client.ChangeResourceRecordSets(&route53.ChangeResourceRecordSetsInput{
-		HostedZoneId: &id,
-		ChangeBatch: &route53.ChangeBatch{
-			Changes: []*route53.Change{{
-				Action: aws.String("UPSERT"),
-				ResourceRecordSet: &route53.ResourceRecordSet{
-					TTL:  aws.Int64(300),
-					Type: record,
-					Name: name,
-					ResourceRecords: []*route53.ResourceRecord{{
-						Value: ip,
-					}},
-				},
-			}},
-		},
-	})
-	return err
 }
 
 func getBMCOutput() (string, error) {
@@ -91,47 +68,61 @@ func getBMCIP() (string, error) {
 
 func update(name string, value string, record string, provider DDNSProvider) error {
 	orig, err := provider.Get(name, record)
-	log.Printf("The '%s' record of %s was %s.\n", record, name, orig)
+	logger.Infof("The '%s' record of %s was %s.\n", record, name, orig)
 	for _, r := range orig {
 		if r == value {
 			// Found
-			log.Printf("No changes made.\n")
+			logger.Infof("No changes made.\n")
 			return err
 		}
 	}
-	log.Printf("Set '%s' record of %s to %s.\n", record, name, value)
+	logger.Infof("Set '%s' record of %s to %s.\n", record, name, value)
 	err = provider.Set(name, value, record)
 	return err
 }
 
-func actionRoute53(c *cli.Context) error {
-	provider, err := newRoute53Provider(c)
-	if err == nil {
-		err = action(c, provider)
-	}
-	return err
-}
+func action(c *cli.Context) {
+	loggo.ConfigureLoggers("ddns=INFO")
 
-func actionRfc2136(c *cli.Context) error {
-	provider, err := newRfc2136Provider(c)
-	if err == nil {
-		err = action(c, provider)
+	homedir, _ := os.UserHomeDir()
+	conf := path.Join(homedir, ".ddns")
+	err := parseSettingsFile(conf)
+	if err != nil {
+		logger.Errorf("Failed to parse config: %s", err)
+		return
 	}
-	return err
-}
 
-func action(c *cli.Context, provider DDNSProvider) error {
-	domain := c.GlobalString("domain")
+	err = mergeCliSettings(c)
+	if err != nil {
+		logger.Errorf("Bad settings: %s", err)
+		return
+	}
+
+	var provider DDNSProvider
+	if settings.Provider == "route53" {
+		provider, err = newRoute53Provider()
+	} else if settings.Provider == "rfc2136" {
+		provider, err = newRfc2136Provider()
+	} else {
+		logger.Errorf("Unsupported ddns provider: %s", settings.Provider)
+		return
+	}
+	if err != nil {
+		logger.Errorf("Failed to setup ddns provider: %s", err)
+		return
+	}
+
+	domain := settings.DomainName
 	hostname, err := os.Hostname()
 
 	// use the first part before "."
 	parts := strings.Split(hostname, ".")
 	hostname = parts[0]
 
-	log.Println("Got hostname", hostname)
+	logger.Infof("Got hostname: %s", hostname)
 	if err != nil {
-		log.Println("Failed to get hostname")
-		return err
+		logger.Errorf("Failed to get hostname")
+		return
 	}
 
 	name := dns.Fqdn(fmt.Sprintf("%s.%s", hostname, domain))
@@ -141,22 +132,22 @@ func action(c *cli.Context, provider DDNSProvider) error {
 	if err4 == nil {
 		err = update(name, ip4, "A", provider)
 		if err != nil {
-			log.Println("Failed to set dns")
-			return err
+			logger.Errorf("Failed to set dns for %s: %s", name, err)
+			return
 		}
 	}
 
 	if err6 == nil {
 		err = update(name, ip6, "AAAA", provider)
 		if err != nil {
-			log.Println("Failed to set dns")
-			return err
+			logger.Errorf("Failed to set dns for %s: %s", name, err)
+			return
 		}
 	}
 
 	if err4 != nil && err6 != nil {
-		log.Println("Failed to get both public ip v4 and v6")
-		return err4
+		logger.Errorf("Failed to get both public ip v4 and v6")
+		return
 	}
 
 	bmc, err := getBMCIP()
@@ -164,12 +155,12 @@ func action(c *cli.Context, provider DDNSProvider) error {
 		name := dns.Fqdn(fmt.Sprintf("bmc-%s.%s", hostname, domain))
 		err = update(name, bmc, "A", provider)
 		if err != nil {
-			log.Println("Failed to set dns")
-			return err
+			logger.Errorf("Failed to set dns for %s: %s", name, err)
+			return
 		}
 	}
 
-	return nil
+	return
 }
 
 func main() {
@@ -177,25 +168,40 @@ func main() {
 		Name:    "ddns",
 		Usage:   "DDNS util",
 		Version: "1.1",
-		Flags: []cli.Flag{&cli.StringFlag{
-			Name:     "domain, d",
-			Usage:    "Domain name",
-			Required: true,
-		}},
-		Commands: []cli.Command{
-			{
-				Name:   "route53",
-				Usage:  "Use route53 as ddns backend",
-				Flags:  route53Flags,
-				Action: actionRoute53,
+		Flags: []cli.Flag{
+			// global settings
+			&cli.StringFlag{
+				Name:  "domain, d",
+				Usage: "Domain name",
 			},
-			{
-				Name:   "rfc2136",
-				Usage:  "Use rfc2136 as ddns backend",
-				Flags:  rfc2136Flags,
-				Action: actionRfc2136,
+			&cli.StringFlag{
+				Name:  "provider, p",
+				Usage: "DDNS provider",
+			},
+			// route53
+			&cli.StringFlag{
+				Name:  "id, i",
+				Usage: "Hosted zone id (for route53)",
+			},
+			// rfc2136
+			&cli.StringFlag{
+				Name:  "ns, n",
+				Usage: "Nameserver address (for rfc2136)",
+			},
+			&cli.StringFlag{
+				Name:  "algo, a",
+				Usage: "TSIG Algorithm (for rfc2136)",
+			},
+			&cli.StringFlag{
+				Name:  "key, k",
+				Usage: "TSIG Key (for rfc2136)",
+			},
+			&cli.StringFlag{
+				Name:  "secret, s",
+				Usage: "TSIG Secret (for rfc2136)",
 			},
 		},
+		Action: action,
 	}
 
 	err := app.Run(os.Args)

@@ -7,7 +7,6 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli"
 )
 
 type rfc2136Provider struct {
@@ -18,37 +17,13 @@ type rfc2136Provider struct {
 	TSIGSecret    string
 }
 
-var rfc2136Flags []cli.Flag
-
-func init() {
-	rfc2136Flags = []cli.Flag{
-		&cli.StringFlag{
-			Name:     "ns, n",
-			Usage:    "Nameserver address",
-			Required: true,
-		},
-		&cli.StringFlag{
-			Name:  "algo, a",
-			Usage: "TSIG Algorithm",
-		},
-		&cli.StringFlag{
-			Name:  "key, k",
-			Usage: "TSIG Key",
-		},
-		&cli.StringFlag{
-			Name:  "secret, s",
-			Usage: "TSIG Secret",
-		},
-	}
-}
-
-func newRfc2136Provider(c *cli.Context) (*rfc2136Provider, error) {
+func newRfc2136Provider() (*rfc2136Provider, error) {
 	return &rfc2136Provider{
-		DomainName:    c.GlobalString("domain"),
-		NameServer:    c.String("ns"),
-		TSIGAlgorithm: c.String("algo"),
-		TSIGKey:       c.String("key"),
-		TSIGSecret:    c.String("secret"),
+		DomainName:    settings.DomainName,
+		NameServer:    settings.NameServer,
+		TSIGAlgorithm: settings.TSIGAlgorithm,
+		TSIGKey:       settings.TSIGKey,
+		TSIGSecret:    settings.TSIGSecret,
 	}, nil
 }
 
@@ -105,18 +80,18 @@ func (p *rfc2136Provider) Get(name string, record string) ([]string, error) {
 	reply, _, err := c.Exchange(m, p.NameServer)
 	ret := []string{}
 	if reply != nil {
-        if reply.Rcode != dns.RcodeSuccess {
-            return nil, fmt.Errorf("DNS query failed: server replied: %s", dns.RcodeToString[reply.Rcode])
-        }
-        for _, r := range reply.Answer {
-            if r.Header().Name == name {
-                if r.Header().Rrtype == dns.TypeA {
-                    ret = append(ret, r.(*dns.A).A.String())
-                } else if r.Header().Rrtype == dns.TypeAAAA {
-                    ret = append(ret, r.(*dns.AAAA).AAAA.String())
-                }
-            }
-        }
+		if reply.Rcode != dns.RcodeSuccess {
+			return nil, fmt.Errorf("DNS query failed: server replied: %s", dns.RcodeToString[reply.Rcode])
+		}
+		for _, r := range reply.Answer {
+			if r.Header().Name == name {
+				if r.Header().Rrtype == dns.TypeA {
+					ret = append(ret, r.(*dns.A).A.String())
+				} else if r.Header().Rrtype == dns.TypeAAAA {
+					ret = append(ret, r.(*dns.AAAA).AAAA.String())
+				}
+			}
+		}
 	}
 	return ret, err
 }
