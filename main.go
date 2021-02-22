@@ -69,12 +69,10 @@ func getBMCIP() (string, error) {
 func update(name string, value string, record string, provider DDNSProvider) error {
 	orig, err := provider.Get(name, record)
 	logger.Infof("The '%s' record of %s was %s.\n", record, name, orig)
-	for _, r := range orig {
-		if r == value {
-			// Found
-			logger.Infof("No changes made.\n")
-			return err
-		}
+	if len(orig) == 1 && orig[0] == value {
+		// Found
+		logger.Infof("No changes made.\n")
+		return err
 	}
 	logger.Infof("Set '%s' record of %s to %s.\n", record, name, value)
 	err = provider.Set(name, value, record)

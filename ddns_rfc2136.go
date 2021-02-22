@@ -29,23 +29,33 @@ func newRfc2136Provider() (*rfc2136Provider, error) {
 
 // learned from https://github.com/go-acme/lego/blob/master/providers/dns/rfc2136/rfc2136.go
 func (p *rfc2136Provider) Set(name string, value string, record string) error {
+	var delRrs []dns.RR
 	var rrs []dns.RR
 	if record == "A" {
 		rr := new(dns.A)
 		rr.Hdr = dns.RR_Header{Name: dns.Fqdn(name), Rrtype: dns.StringToType[record], Class: dns.ClassINET, Ttl: uint32(300)}
 		rr.A = net.ParseIP(value)
 		rrs = []dns.RR{rr}
+
+		delRr := new(dns.A)
+		delRr.Hdr = dns.RR_Header{Name: dns.Fqdn(name), Rrtype: dns.StringToType[record], Class: dns.ClassANY, Ttl: uint32(0)}
+		delRrs = []dns.RR{delRr}
 	} else if record == "AAAA" {
 		rr := new(dns.AAAA)
 		rr.Hdr = dns.RR_Header{Name: dns.Fqdn(name), Rrtype: dns.StringToType[record], Class: dns.ClassINET, Ttl: uint32(300)}
 		rr.AAAA = net.ParseIP(value)
 		rrs = []dns.RR{rr}
+
+		delRr := new(dns.AAAA)
+		delRr.Hdr = dns.RR_Header{Name: dns.Fqdn(name), Rrtype: dns.StringToType[record], Class: dns.ClassANY, Ttl: uint32(0)}
+		delRrs = []dns.RR{delRr}
 	} else {
 		return fmt.Errorf("Unsupported record type: %s", record)
 	}
 
 	m := new(dns.Msg)
 	m.SetUpdate(dns.Fqdn(p.DomainName))
+	m.RemoveRRset(delRrs)
 	m.Insert(rrs)
 
 	c := &dns.Client{}
