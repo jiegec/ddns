@@ -190,7 +190,7 @@ func action(c *cli.Context) {
 
 	bmc, err := getBMCIP()
 	if err == nil {
-		name := dns.Fqdn(fmt.Sprintf("bmc-%s.%s", hostname, domain))
+		name := dns.Fqdn(fmt.Sprintf("%s-bmc.%s", hostname, domain))
 		setIPv4(name, bmc, provider)
 	}
 
