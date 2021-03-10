@@ -112,11 +112,14 @@ func setIPv4(name string, ip4 string, provider DDNSProvider) {
 	}
 
 	if isLocalIP(ip4) {
+		logger.Infof("Set rDNS for public IP")
 		rDNS, _ := dns.ReverseAddr(ip4)
 		err = update(rDNS, name, "PTR", provider)
 		if err != nil {
 			logger.Errorf("Failed to set reverse dns for %s: %s", name, err)
 		}
+	} else {
+		logger.Infof("Skip rDNS setting because of non local public IP")
 	}
 }
 

@@ -110,6 +110,8 @@ func (p *rfc2136Provider) Get(name string, record string) ([]string, error) {
 					ret = append(ret, r.(*dns.A).A.String())
 				} else if r.Header().Rrtype == dns.TypeAAAA {
 					ret = append(ret, r.(*dns.AAAA).AAAA.String())
+				} else if r.Header().Rrtype == dns.TypePTR {
+					ret = append(ret, r.(*dns.PTR).Ptr)
 				}
 			}
 		}
