@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -83,6 +84,26 @@ func update(name string, value string, record string, provider DDNSProvider) err
 	return err
 }
 
+func isLocalIP(match string) bool {
+	ifaces, _ := net.Interfaces()
+	for _, i := range ifaces {
+		addrs, _ := i.Addrs()
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip.String() == match {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func setIPv4(name string, ip4 string, provider DDNSProvider) {
 	err := update(name, ip4, "A", provider)
 	if err != nil {
@@ -90,10 +111,12 @@ func setIPv4(name string, ip4 string, provider DDNSProvider) {
 		return
 	}
 
-	rDNS, _ := dns.ReverseAddr(ip4)
-	err = update(rDNS, name, "PTR", provider)
-	if err != nil {
-		logger.Errorf("Failed to set reverse dns for %s: %s", name, err)
+	if isLocalIP(ip4) {
+		rDNS, _ := dns.ReverseAddr(ip4)
+		err = update(rDNS, name, "PTR", provider)
+		if err != nil {
+			logger.Errorf("Failed to set reverse dns for %s: %s", name, err)
+		}
 	}
 }
 
