@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/miekg/dns"
@@ -10,7 +11,6 @@ import (
 )
 
 type rfc2136Provider struct {
-	DomainName    string
 	NameServer    string
 	TSIGAlgorithm string
 	TSIGKey       string
@@ -19,7 +19,6 @@ type rfc2136Provider struct {
 
 func newRfc2136Provider() (*rfc2136Provider, error) {
 	return &rfc2136Provider{
-		DomainName:    settings.DomainName,
 		NameServer:    settings.NameServer,
 		TSIGAlgorithm: settings.TSIGAlgorithm,
 		TSIGKey:       settings.TSIGKey,
@@ -49,12 +48,24 @@ func (p *rfc2136Provider) Set(name string, value string, record string) error {
 		delRr := new(dns.AAAA)
 		delRr.Hdr = dns.RR_Header{Name: dns.Fqdn(name), Rrtype: dns.StringToType[record], Class: dns.ClassANY, Ttl: uint32(0)}
 		delRrs = []dns.RR{delRr}
+	} else if record == "PTR" {
+		rr := new(dns.PTR)
+		rr.Hdr = dns.RR_Header{Name: dns.Fqdn(name), Rrtype: dns.StringToType[record], Class: dns.ClassINET, Ttl: uint32(300)}
+		rr.Ptr = value
+		rrs = []dns.RR{rr}
+
+		delRr := new(dns.PTR)
+		delRr.Hdr = dns.RR_Header{Name: dns.Fqdn(name), Rrtype: dns.StringToType[record], Class: dns.ClassANY, Ttl: uint32(0)}
+		delRrs = []dns.RR{delRr}
 	} else {
 		return fmt.Errorf("Unsupported record type: %s", record)
 	}
 
+	parts := strings.Split(dns.Fqdn(name), ".")
+	zone := strings.Join(parts[1:], ".")
+
 	m := new(dns.Msg)
-	m.SetUpdate(dns.Fqdn(p.DomainName))
+	m.SetUpdate(zone)
 	m.RemoveRRset(delRrs)
 	m.Insert(rrs)
 

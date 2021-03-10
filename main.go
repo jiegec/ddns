@@ -14,6 +14,7 @@ import (
 
 	"github.com/juju/loggo"
 	"github.com/miekg/dns"
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 )
 
@@ -21,22 +22,25 @@ var logger = loggo.GetLogger("ddns")
 
 func getIP(ipv6 bool) (string, error) {
 	client := &http.Client{
-		Timeout: time.Second * 2,
+		Timeout: time.Second * 5,
 	}
-	url := "http://api.ipify.org"
+	urls := []string{"http://api.ipify.org", "http://ipinfo.io/ip"}
 	if ipv6 {
-		url = "http://api6.ipify.org"
+		urls = []string{"http://api6.ipify.org"}
 	}
-	resp, err := client.Get(url)
-	if err != nil {
-		return "", err
+	for _, url := range urls {
+		resp, err := client.Get(url)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			continue
+		}
+		return string(body), nil
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(body), nil
+	return "", errors.Errorf("Failed to get ip from any source")
 }
 
 func getBMCOutput() (string, error) {
@@ -77,6 +81,20 @@ func update(name string, value string, record string, provider DDNSProvider) err
 	logger.Infof("Set '%s' record of %s to %s.\n", record, name, value)
 	err = provider.Set(name, value, record)
 	return err
+}
+
+func setIPv4(name string, ip4 string, provider DDNSProvider) {
+	err := update(name, ip4, "A", provider)
+	if err != nil {
+		logger.Errorf("Failed to set dns for %s: %s", name, err)
+		return
+	}
+
+	rDNS, _ := dns.ReverseAddr(ip4)
+	err = update(rDNS, name, "PTR", provider)
+	if err != nil {
+		logger.Errorf("Failed to set reverse dns for %s: %s", name, err)
+	}
 }
 
 func action(c *cli.Context) {
@@ -126,15 +144,11 @@ func action(c *cli.Context) {
 	name := dns.Fqdn(fmt.Sprintf("%s.%s", hostname, domain))
 
 	ip4, err4 := getIP(false)
-	ip6, err6 := getIP(true)
 	if err4 == nil {
-		err = update(name, ip4, "A", provider)
-		if err != nil {
-			logger.Errorf("Failed to set dns for %s: %s", name, err)
-			return
-		}
+		setIPv4(name, ip4, provider)
 	}
 
+	ip6, err6 := getIP(true)
 	if err6 == nil {
 		err = update(name, ip6, "AAAA", provider)
 		if err != nil {
@@ -151,11 +165,7 @@ func action(c *cli.Context) {
 	bmc, err := getBMCIP()
 	if err == nil {
 		name := dns.Fqdn(fmt.Sprintf("bmc-%s.%s", hostname, domain))
-		err = update(name, bmc, "A", provider)
-		if err != nil {
-			logger.Errorf("Failed to set dns for %s: %s", name, err)
-			return
-		}
+		setIPv4(name, bmc, provider)
 	}
 
 	return
