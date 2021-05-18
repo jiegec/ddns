@@ -118,7 +118,7 @@ func setIPv4(name string, ip4 string, provider DDNSProvider, isBMC bool) {
 		return
 	}
 
-	if isLocalIP(ip4) && !isBMC {
+	if isLocalIP(ip4) || isBMC {
 		logger.Infof("Set rDNS for public IP")
 		rDNS, _ := dns.ReverseAddr(ip4)
 		err = update(rDNS, name, "PTR", provider)
