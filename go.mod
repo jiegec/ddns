@@ -6,6 +6,7 @@ require (
 	github.com/aws/aws-sdk-go v1.37.15
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/jackpal/gateway v1.0.7 // indirect
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/kr/text v0.2.0 // indirect
 	github.com/miekg/dns v1.1.38

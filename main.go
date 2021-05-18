@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackpal/gateway"
 	"github.com/juju/loggo"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
@@ -40,6 +41,12 @@ func getIP(ipv6 bool) (string, error) {
 			continue
 		}
 		return string(body), nil
+	}
+	if !ipv6 {
+		ip, err := gateway.DiscoverInterface()
+		if err == nil {
+			return ip.To4().String(), nil
+		}
 	}
 	return "", errors.Errorf("Failed to get ip from any source")
 }
