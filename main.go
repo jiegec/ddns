@@ -111,14 +111,14 @@ func isLocalIP(match string) bool {
 	return false
 }
 
-func setIPv4(name string, ip4 string, provider DDNSProvider) {
+func setIPv4(name string, ip4 string, provider DDNSProvider, isBMC bool) {
 	err := update(name, ip4, "A", provider)
 	if err != nil {
 		logger.Errorf("Failed to set dns for %s: %s", name, err)
 		return
 	}
 
-	if isLocalIP(ip4) {
+	if isLocalIP(ip4) && !isBMC {
 		logger.Infof("Set rDNS for public IP")
 		rDNS, _ := dns.ReverseAddr(ip4)
 		err = update(rDNS, name, "PTR", provider)
@@ -178,7 +178,7 @@ func action(c *cli.Context) {
 
 	ip4, err4 := getIP(false)
 	if err4 == nil {
-		setIPv4(name, ip4, provider)
+		setIPv4(name, ip4, provider, false)
 	}
 
 	ip6, err6 := getIP(true)
@@ -198,7 +198,7 @@ func action(c *cli.Context) {
 	bmc, err := getBMCIP()
 	if err == nil {
 		name := dns.Fqdn(fmt.Sprintf("%s-bmc.%s", hostname, domain))
-		setIPv4(name, bmc, provider)
+		setIPv4(name, bmc, provider, true)
 	}
 
 	return
